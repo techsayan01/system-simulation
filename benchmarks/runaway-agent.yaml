@@ -1,0 +1,59 @@
+apiVersion: sim/v1
+design:
+  id: runaway-agent
+  description: >
+    Support agent with no step cap and no budget cap. A failed tool call makes the
+    agent re-plan and try again, so when the tool is down the loop keeps calling the
+    LLM with an ever-growing context until something else stops it.
+traffic:
+  classes:
+    - id: ticket
+      entry: api
+      arrival: { kind: poisson, rate_rps: 2 }
+      attrs:
+        input_tokens: { dist: lognormal, p50: 1500, p95: 3000 }
+        output_tokens: 0
+      client:
+        timeout_ms: 120000
+        retry: { max: 1, backoff: constant, base_ms: 1000 }
+components:
+  - id: api
+    type: web/service
+    params:
+      concurrency: 200
+  - id: agent
+    type: genai/agent-loop
+    params:
+      concurrency: 300
+      steps_mean: 3
+      loop_cap: null
+      budget_cap_usd: null
+      context_growth_tokens_per_step: 800
+      step_output_tokens: { dist: lognormal, p50: 80, p95: 200 }
+  - id: llm
+    type: genai/llm-provider
+    params:
+      rpm: 20000
+      itpm: 100000000
+      otpm: 10000000
+  - id: search
+    type: genai/tool
+    params:
+      service_time_ms: { dist: lognormal, p50: 200, p95: 600 }
+calls:
+  - from: api
+    to: agent
+    policy:
+      timeout_ms: 90000
+  - from: agent
+    to: llm
+    per: step
+    policy:
+      timeout_ms: 30000
+      retry: { max: 2, backoff: exponential, base_ms: 1000, jitter: true }
+  - from: agent
+    to: search
+    per: step
+    on_error: replan
+    policy:
+      timeout_ms: 5000

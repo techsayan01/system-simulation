@@ -1,0 +1,11 @@
+{
+  "kind": "ComponentType",
+  "id": "web/load-balancer",
+  "version": "0.1.0",
+  "primitive": "router",
+  "fidelity": "queueing",
+  "description": "Layer 7 load balancer. Forwards each request to one backend; adds no queueing in this prototype.",
+  "defaults": {
+    "strategy": "round_robin"
+  }
+}

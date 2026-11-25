@@ -1,0 +1,19 @@
+{
+  "kind": "ComponentType",
+  "id": "genai/agent-loop",
+  "version": "0.1.0",
+  "primitive": "loop",
+  "fidelity": "queueing",
+  "description": "Agent loop. Each step runs its per-step calls (usually an LLM call then a tool call). After a clean step it stops with probability 1/steps_mean; a failed tool call with on_error: replan costs a step and the loop continues. Context grows by a fixed number of tokens per step.",
+  "defaults": {
+    "concurrency": 100,
+    "queue_limit": null,
+    "step_overhead_ms": { "dist": "lognormal", "p50": 20, "p95": 80 },
+    "steps_mean": 3,
+    "loop_cap": null,
+    "budget_cap_usd": null,
+    "context_growth_tokens_per_step": 600,
+    "step_output_tokens": { "dist": "lognormal", "p50": 120, "p95": 400 },
+    "error_rate": 0
+  }
+}

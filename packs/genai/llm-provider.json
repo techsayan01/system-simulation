@@ -1,0 +1,20 @@
+{
+  "kind": "ComponentType",
+  "id": "genai/llm-provider",
+  "version": "0.1.0",
+  "primitive": "llm",
+  "fidelity": "queueing",
+  "description": "Hosted LLM API. Separate per-minute token buckets for requests, input tokens and output tokens (429 when any is empty); latency = time to first token + output tokens / output speed; priced per million tokens. Defaults are placeholders, not any provider's real limits or prices.",
+  "defaults": {
+    "rpm": 500,
+    "itpm": 800000,
+    "otpm": 160000,
+    "count_rejected_toward_rpm": true,
+    "max_concurrency": null,
+    "ttft_ms": { "dist": "lognormal", "p50": 450, "p95": 1200 },
+    "output_tps": 60,
+    "error_rate": 0.002,
+    "price_input_per_mtok": 3,
+    "price_output_per_mtok": 15
+  }
+}

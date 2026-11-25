@@ -1,0 +1,37 @@
+apiVersion: sim/v1
+design:
+  id: retry-storm
+  description: >
+    Web checkout path with retries at two layers and no backoff. Healthy at normal
+    load (database about 40% busy); a short spike pushes the database past capacity,
+    timeouts trigger retries that multiply load, and the system stays down after the
+    spike ends (metastable failure).
+traffic:
+  classes:
+    - id: checkout
+      entry: lb
+      arrival: { kind: poisson, rate_rps: 80 }
+      client:
+        timeout_ms: 1000
+        retry: { max: 2, backoff: none }
+components:
+  - id: lb
+    type: web/load-balancer
+  - id: api
+    type: web/service
+    params:
+      concurrency: 64
+      service_time_ms: { dist: lognormal, p50: 2, p95: 6 }
+  - id: db
+    type: web/database
+    params:
+      concurrency: 4
+      service_time_ms: { dist: lognormal, p50: 16, p95: 40 }
+calls:
+  - from: lb
+    to: api
+  - from: api
+    to: db
+    policy:
+      timeout_ms: 250
+      retry: { max: 2, backoff: none }

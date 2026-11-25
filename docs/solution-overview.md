@@ -18,7 +18,7 @@ This page is the short version of the whole product: what it is built with, how 
 | --- | --- | --- |
 | Language and runtime | TypeScript on Node.js LTS | Apache-2.0 / MIT |
 | Monorepo and build | pnpm workspaces, Turborepo, Vite | MIT |
-| Simulation engine | Our own TypeScript core with no I/O; seeded PCG32 random numbers implemented in-repo | MIT (ours) |
+| Simulation engine | Our own TypeScript core with no I/O; seeded xoshiro128** random numbers implemented in-repo | MIT (ours) |
 | Schemas and validation | Zod, with JSON Schema generated from it for design files | MIT |
 | Plugin rules and formulas | Common Expression Language (CEL) via `@marcbachmann/cel-js`: safe, side-effect free, not Turing-complete | MIT |
 | Web app | React, React Flow (`@xyflow/react`) for the canvas, TanStack Query, Tailwind CSS | MIT |

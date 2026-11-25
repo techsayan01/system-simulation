@@ -1,0 +1,11 @@
+{
+  "name": "@sim/packs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": { ".": "./index.ts" },
+  "dependencies": {
+    "@sim/model": "workspace:*"
+  }
+}

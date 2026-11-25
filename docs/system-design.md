@@ -209,7 +209,7 @@ Fidelity labels: `formula` (closed form, e.g. limit arithmetic, Bloom false-posi
 **Approach.** Process-light discrete-event simulation: a binary-heap event queue ordered by `(time, sequence)`, request entities flowing through primitives, and component state machines. No threads, no async in the core loop.
 
 **Determinism.**
-- Seeded counter-based PRNG (e.g. PCG32 or xoshiro128**), one independent stream per component and per traffic class, derived from `(run seed, component id)`. Adding a component does not shift other components' random draws, which keeps before/after comparisons fair (common random numbers).
+- Seeded PRNG (xoshiro128**, seeded through splitmix32 from a hash of the stream name), one independent stream per component and per traffic class, derived from `(run seed, component id)`. Adding a component does not shift other components' random draws, which keeps before/after comparisons fair (common random numbers).
 - Simulated time only; integer microseconds to avoid float drift.
 - Stable iteration order everywhere (sorted ids, no hash-map iteration order dependence).
 - A run is identified by `hash(design version, pack versions, plugin versions, scenario, seed, engine version)`; this hash is printed on every finding.
@@ -367,7 +367,7 @@ Final stack. The platform is MIT-licensed open source and every shipped dependen
 | Layer | Decision | Why |
 | --- | --- | --- |
 | Monorepo | pnpm workspaces + Turborepo + Vite | Shared engine across browser, worker and CI |
-| Engine, model, detectors | TypeScript, pure, no I/O; in-repo PCG32 PRNG; Zod schemas → JSON Schema | Runs everywhere; portable to Rust/WASM later |
+| Engine, model, detectors | TypeScript, pure, no I/O; in-repo xoshiro128** PRNG; Zod schemas → JSON Schema | Runs everywhere; portable to Rust/WASM later |
 | Plugin expressions | CEL via `@marcbachmann/cel-js` | Sandboxed, non-Turing-complete, MIT |
 | Web app | React + React Flow (`@xyflow/react`) + TanStack Query + Tailwind; Apache ECharts with pattern fills | Mature canvas editing; accessible charts |
 | API | Fastify, OpenAPI | Same language as engine; simple ops |
@@ -427,7 +427,7 @@ The BRD's roadmap figure was not included in the markdown export, so this is a p
 
 | Phase | Scope | Exit gate |
 | --- | --- | --- |
-| **0. Proof prototype** | CLI only. IR + engine (station, limiter, router, loop) + 6 GenAI/web component types + spike/ramp/limit-squeeze scenarios + 4 detectors (retry amplification, metastable, rate-limit cascade, runaway loop) + JSON findings. | Detects a retry storm, a provider rate-limit cascade and a runaway agent loop on the benchmark designs **without manual probing**, deterministically (BRD next step 2). |
+| **0. Proof prototype** — built, gate passed 2026-11-25 ([phase-0.md](phase-0.md)) | CLI only. IR + engine (station, limiter, router, loop) + 6 GenAI/web component types + baseline/ramp/spike/limit-squeeze/outage scenarios + 5 detectors (retry amplification, metastable, rate-limit cascade, first limit reached, runaway loop) + JSON findings. | Detects a retry storm, a provider rate-limit cascade and a runaway agent loop on the benchmark designs **without manual probing**, deterministically (BRD next step 2). |
 | **1. MVP for one consultancy** | Canvas editor, full web + GenAI packs, standard scenario battery, all detectors, rule checks, fix recommender with paired re-simulation, cost projection, HTML/PDF report (no LLM), Docker Compose self-host. | Used on 2–3 real reviews; first findings in < 30 min; reviewer rejection rate measured. |
 | **2. Extensibility and calibration** | Technique plugin format + 20–30 starter plugins with benchmarks, calibration from logs, sensitivity ranges, guarded LLM narration. | All plugins pass benchmarks; reports show ranges and assumptions; ≥90% detection on benchmark suite. |
 | **3. Import and scale-out** | Terraform import (AWS first), event-fidelity plugins (gossip), fix combinations, multi-tenant managed option, Helm. | Import maps ≥80% of resources on sample client plans; decision on product vs internal tool made. |
@@ -438,7 +438,7 @@ Workstreams that can run in parallel within Phase 1: engine + detectors; canvas 
 
 | ADR | Decision | Status and outcome | Needed by |
 | --- | --- | --- | --- |
-| ADR-01 | Build on Breakscale's engine or write new core | **Open.** Breakscale is MIT licensed (2026-11-25), so reuse is legally fine with attribution; the remaining question is technical fit. Recommended: write a new, small core and borrow ideas, because determinism, token-carrying requests and edge policies are cheaper to design in than retrofit. Decide after reading its engine code. | Before Phase 0 |
+| ADR-01 | Build on Breakscale's engine or write new core | **Decided (2026-11-25):** new core. Phase 0 was built without Breakscale code; the new engine already covers determinism, token-carrying requests and edge retry policies, which were the reasons to prefer it. Breakscale is MIT licensed, so individual ideas or components can still be borrowed with attribution. | Before Phase 0 |
 | ADR-02 | Engine language | **Decided:** TypeScript; Rust→WASM only if profiling shows the need | Before Phase 0 |
 | ADR-03 | Expression language for plugins | **Decided:** CEL via `@marcbachmann/cel-js` (MIT); code escape hatch only for `event` fidelity | Phase 2 |
 | ADR-04 | Deployment model at launch | **Decided:** self-hosted Docker Compose first | Phase 1 |

@@ -1,0 +1,14 @@
+{
+  "kind": "ComponentType",
+  "id": "web/service",
+  "version": "0.1.0",
+  "primitive": "station",
+  "fidelity": "queueing",
+  "description": "Stateless application service. Holds a worker slot for its own processing and for every synchronous downstream call.",
+  "defaults": {
+    "concurrency": 64,
+    "service_time_ms": { "dist": "lognormal", "p50": 5, "p95": 20 },
+    "queue_limit": null,
+    "error_rate": 0.001
+  }
+}

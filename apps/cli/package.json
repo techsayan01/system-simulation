@@ -1,0 +1,16 @@
+{
+  "name": "@sim/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "bin": { "sim": "./src/main.ts" },
+  "dependencies": {
+    "@sim/detectors": "workspace:*",
+    "@sim/engine": "workspace:*",
+    "@sim/model": "workspace:*",
+    "@sim/packs": "workspace:*",
+    "@sim/scenarios": "workspace:*",
+    "yaml": "^2.9.1"
+  }
+}

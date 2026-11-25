@@ -1,0 +1,18 @@
+# Phase 0 benchmark suite: designs with known failure modes.
+# The gate passes when every expected finding is detected by the standard battery
+# without choosing scenarios by hand, nothing is reported at normal load, and the
+# control design produces no finding of medium severity or above.
+benchmarks:
+  - name: retry-storm
+    design: retry-storm.yaml
+    expect: [retry_amplification, metastable_failure]
+  - name: rate-limit-cascade
+    design: rate-limit-cascade.yaml
+    expect: [rate_limit_cascade, first_limit_reached]
+  - name: runaway-agent
+    design: runaway-agent.yaml
+    expect: [runaway_agent_loop]
+  - name: healthy
+    design: healthy.yaml
+    expect: []
+    max_severity: low

@@ -1,0 +1,36 @@
+apiVersion: sim/v1
+design:
+  id: rate-limit-cascade
+  description: >
+    Chat assistant calling one LLM provider through a thin gateway that retries 429s
+    immediately up to four times. Input tokens are the first limit to run out; each
+    rejected retry still counts against the request limit, so retries drain it and
+    the provider ends up rejecting almost everything.
+traffic:
+  classes:
+    - id: chat
+      entry: gateway
+      arrival: { kind: poisson, rate_rps: 10 }
+      attrs:
+        input_tokens: { dist: lognormal, p50: 1500, p95: 4000 }
+        output_tokens: { dist: lognormal, p50: 300, p95: 900 }
+      client:
+        timeout_ms: 60000
+components:
+  - id: gateway
+    type: web/service
+    params:
+      concurrency: 500
+      service_time_ms: { dist: lognormal, p50: 3, p95: 10 }
+  - id: llm
+    type: genai/llm-provider
+    params:
+      rpm: 1000
+      itpm: 1500000
+      otpm: 600000
+calls:
+  - from: gateway
+    to: llm
+    policy:
+      timeout_ms: 30000
+      retry: { max: 4, backoff: none, on: [rate_limited, error] }

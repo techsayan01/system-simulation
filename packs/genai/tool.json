@@ -1,0 +1,14 @@
+{
+  "kind": "ComponentType",
+  "id": "genai/tool",
+  "version": "0.1.0",
+  "primitive": "station",
+  "fidelity": "queueing",
+  "description": "Tool or function called by an agent (search, internal API, code runner).",
+  "defaults": {
+    "concurrency": 50,
+    "service_time_ms": { "dist": "lognormal", "p50": 150, "p95": 600 },
+    "queue_limit": null,
+    "error_rate": 0.02
+  }
+}

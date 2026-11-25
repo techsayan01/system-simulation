@@ -1,0 +1,14 @@
+{
+  "kind": "ComponentType",
+  "id": "web/database",
+  "version": "0.1.0",
+  "primitive": "station",
+  "fidelity": "queueing",
+  "description": "Relational database primary modelled as a connection pool with a query service-time distribution.",
+  "defaults": {
+    "concurrency": 16,
+    "service_time_ms": { "dist": "lognormal", "p50": 8, "p95": 30 },
+    "queue_limit": null,
+    "error_rate": 0.0005
+  }
+}

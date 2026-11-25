@@ -1,0 +1,73 @@
+apiVersion: sim/v1
+design:
+  id: healthy
+  description: >
+    Well-provisioned web and GenAI design used as a control: timeouts everywhere,
+    one retry with exponential backoff and jitter, a fallback-free but generously
+    limited LLM, and an agent loop with a step cap and a budget cap. The analyzer
+    should report no problems of medium severity or above.
+traffic:
+  classes:
+    - id: web
+      entry: lb
+      arrival: { kind: poisson, rate_rps: 40 }
+      client:
+        timeout_ms: 2000
+        retry: { max: 1, backoff: exponential, base_ms: 200, jitter: true }
+    - id: assist
+      entry: assistant
+      arrival: { kind: poisson, rate_rps: 1 }
+      attrs:
+        input_tokens: { dist: lognormal, p50: 1200, p95: 3000 }
+        output_tokens: 0
+      client:
+        timeout_ms: 120000
+components:
+  - id: lb
+    type: web/load-balancer
+  - id: api
+    type: web/service
+    params:
+      concurrency: 256
+  - id: db
+    type: web/database
+    params:
+      concurrency: 32
+      service_time_ms: { dist: lognormal, p50: 8, p95: 25 }
+  - id: assistant
+    type: genai/agent-loop
+    params:
+      concurrency: 100
+      steps_mean: 3
+      loop_cap: 10
+      budget_cap_usd: 0.5
+      context_growth_tokens_per_step: 600
+      step_output_tokens: { dist: lognormal, p50: 80, p95: 200 }
+  - id: llm
+    type: genai/llm-provider
+    params:
+      rpm: 5000
+      itpm: 20000000
+      otpm: 2000000
+  - id: kb
+    type: genai/tool
+calls:
+  - from: lb
+    to: api
+  - from: api
+    to: db
+    policy:
+      timeout_ms: 500
+      retry: { max: 1, backoff: exponential, base_ms: 50, jitter: true }
+  - from: assistant
+    to: llm
+    per: step
+    policy:
+      timeout_ms: 30000
+      retry: { max: 1, backoff: exponential, base_ms: 1000, jitter: true }
+  - from: assistant
+    to: kb
+    per: step
+    on_error: replan
+    policy:
+      timeout_ms: 3000
