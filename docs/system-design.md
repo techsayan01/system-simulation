@@ -1,8 +1,8 @@
 # System Design: Design-Time System Simulation Platform
 
-Status: draft v0.1 · 2026-11-25 · derived from [brd.md](brd.md)
+Status: draft v0.2 · 2026-11-25 · derived from [brd.md](brd.md) · short version: [solution-overview.md](solution-overview.md)
 
-This document turns the BRD into a buildable architecture: the modules, the data model, how the engine stays deterministic, how the analyzer finds failures without the user probing, how fixes are proven, and the order to build it in. Decisions that are still open are listed in section 17 with a recommended default.
+This document turns the BRD into a buildable architecture: the modules, the data model, how the engine stays deterministic, how the analyzer finds failures without the user probing, how fixes are proven, and the order to build it in. Decisions are tracked in section 17; the tech stack in section 14 is final.
 
 ---
 
@@ -362,19 +362,23 @@ benchmark:
 
 ## 14. Platform, deployment and tech stack
 
-| Layer | Recommendation | Why |
+Final stack. The platform is MIT-licensed open source and every shipped dependency is permissively licensed (ADR-07). Licences are listed in [solution-overview.md](solution-overview.md#a-tech-stack).
+
+| Layer | Decision | Why |
 | --- | --- | --- |
-| Monorepo | pnpm workspaces + Turborepo | Shared engine across browser, worker and CI |
-| Engine, model, detectors | TypeScript, pure, no I/O | Runs everywhere; portable to Rust/WASM later |
-| Web app | React + React Flow (canvas) + a charting lib with accessible patterns | Mature canvas editing |
-| API | Node (Fastify) or similar, OpenAPI | Same language as engine; simple ops |
-| Jobs | Postgres-backed queue (e.g. pg-boss) first; move to a dedicated broker only if needed | Fewer moving parts for self-hosting |
+| Monorepo | pnpm workspaces + Turborepo + Vite | Shared engine across browser, worker and CI |
+| Engine, model, detectors | TypeScript, pure, no I/O; in-repo PCG32 PRNG; Zod schemas → JSON Schema | Runs everywhere; portable to Rust/WASM later |
+| Plugin expressions | CEL via `@marcbachmann/cel-js` | Sandboxed, non-Turing-complete, MIT |
+| Web app | React + React Flow (`@xyflow/react`) + TanStack Query + Tailwind; Apache ECharts with pattern fills | Mature canvas editing; accessible charts |
+| API | Fastify, OpenAPI | Same language as engine; simple ops |
+| Jobs | pg-boss on Postgres; dedicated broker only if needed | Fewer moving parts for self-hosting |
 | Workers | Node worker threads in containers; horizontal scale | Sweeps are embarrassingly parallel |
-| Storage | Postgres (projects, design versions, findings), S3-compatible object store (run series, traces, reports) | MinIO for self-hosted |
-| Reports | HTML templates + headless Chromium for PDF | One rendering path |
-| Narrator | Provider-agnostic interface; supports hosted APIs and local models; off by default in self-hosted | Privacy (BR-10) |
+| Storage | Postgres + Drizzle ORM (projects, design versions, findings); local disk behind an S3-compatible interface for run series, traces and reports; SeaweedFS at scale | Avoids AGPL MinIO |
+| Reports | HTML templates + Playwright (headless Chromium) for PDF | One rendering path |
+| Narrator | Provider-agnostic interface; Ollama for local models; off by default | Privacy (BR-10) |
 | Deployment | Docker Compose for single-tenant self-hosted; Helm chart later; optional managed cloud | NFR "Privacy" |
-| Auth | OIDC/SSO; workspace per engagement; audit log of runs and report exports | Consultancy client separation |
+| Auth | OIDC/SSO with bundled Keycloak; workspace per engagement; audit log of runs and report exports | Consultancy client separation |
+| Testing and CI | Vitest, fast-check, Playwright; GitHub Actions runs benchmark suite and plugin gates | Section 15 |
 
 Proposed repository layout:
 
@@ -432,14 +436,15 @@ Workstreams that can run in parallel within Phase 1: engine + detectors; canvas 
 
 ## 17. Architecture decisions to record (ADRs)
 
-| ADR | Decision | Recommended default | Blocking? |
+| ADR | Decision | Status and outcome | Needed by |
 | --- | --- | --- | --- |
-| ADR-01 | Build on Breakscale's engine or write new core | Write a new, small core; borrow ideas only. The core needs determinism, request attributes (tokens) and edge policies that are cheaper to design in than retrofit. Re-check once Breakscale's license and code are reviewed. | Before Phase 0 |
-| ADR-02 | Engine language | TypeScript now; Rust→WASM only if profiling shows the need | Before Phase 0 |
-| ADR-03 | Expression language for plugins | CEL-like sandboxed expressions; code escape hatch only for `event` fidelity | Phase 2 |
-| ADR-04 | Deployment model at launch | Self-hosted Docker Compose first (fits BR-10 and an internal-tool start) | Phase 1 |
-| ADR-05 | First LLM providers covered | Two or three major hosted providers + one OpenAI-compatible gateway profile | Phase 0 |
-| ADR-06 | Detector thresholds | Data-driven per detector, tuned on the benchmark suite, shown in the report | Phase 1 |
+| ADR-01 | Build on Breakscale's engine or write new core | **Open.** Breakscale is MIT licensed (2026-11-25), so reuse is legally fine with attribution; the remaining question is technical fit. Recommended: write a new, small core and borrow ideas, because determinism, token-carrying requests and edge policies are cheaper to design in than retrofit. Decide after reading its engine code. | Before Phase 0 |
+| ADR-02 | Engine language | **Decided:** TypeScript; Rust→WASM only if profiling shows the need | Before Phase 0 |
+| ADR-03 | Expression language for plugins | **Decided:** CEL via `@marcbachmann/cel-js` (MIT); code escape hatch only for `event` fidelity | Phase 2 |
+| ADR-04 | Deployment model at launch | **Decided:** self-hosted Docker Compose first | Phase 1 |
+| ADR-05 | First LLM providers covered | **Open.** Recommended: two or three major hosted providers + one OpenAI-compatible gateway profile | Phase 0 |
+| ADR-06 | Detector thresholds | **Open.** Recommended: data-driven per detector, tuned on the benchmark suite, shown in the report | Phase 1 |
+| ADR-07 | Licence and dependency policy | **Decided:** product is MIT open source; shipped dependencies must be MIT, Apache-2.0, BSD, ISC or MPL-2.0; GPL/AGPL/SSPL/BSL only as separately run optional services | Now |
 
 ## 18. Risks specific to the design
 
