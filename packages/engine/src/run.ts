@@ -105,13 +105,15 @@ export function runId(design: Design, registry: Registry, scenario: Scenario, se
   );
 }
 
-/** Simulate one scenario against a design. Pure and deterministic for a given seed. */
-export function runScenario(design: Design, registry: Registry, scenario: Scenario, opts: RunOptions): RunResult {
-  const { seed } = opts;
-  const budget = opts.eventBudget ?? 40_000_000;
-  const sim = new Sim();
-  const ctx: Ctx = { sim, faults: new Faults(scenario.faults), cost: { total: 0 } };
+export interface Model {
+  nodes: Map<string, NodeRt>;
+  edges: Map<string, EdgeRt>;
+  edgeIsClient: Map<string, boolean>;
+  classes: ClassRt[];
+}
 
+/** Turn a design into runtime components, calls and traffic sources on one simulator. */
+export function buildModel(design: Design, registry: Registry, ctx: Ctx, seed: number): Model {
   const nodes = new Map<string, NodeRt>();
   for (const c of design.components) {
     const r = resolveComponent(c, registry);
@@ -172,6 +174,18 @@ export function runScenario(design: Design, registry: Registry, scenario: Scenar
       ),
     );
   }
+
+  return { nodes, edges, edgeIsClient, classes };
+}
+
+/** Simulate one scenario against a design. Pure and deterministic for a given seed. */
+export function runScenario(design: Design, registry: Registry, scenario: Scenario, opts: RunOptions): RunResult {
+  const { seed } = opts;
+  const budget = opts.eventBudget ?? 40_000_000;
+  const sim = new Sim();
+  const ctx: Ctx = { sim, faults: new Faults(scenario.faults), cost: { total: 0 } };
+
+  const { nodes, edges, edgeIsClient, classes } = buildModel(design, registry, ctx, seed);
 
   const windowUs = 1_000_000;
   const windows = Math.ceil(scenario.duration_s);

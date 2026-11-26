@@ -10,6 +10,8 @@
   "scripts": {
     "sim": "tsx apps/cli/src/main.ts",
     "bench": "tsx apps/cli/src/main.ts bench",
+    "dev": "pnpm --filter @sim/web dev",
+    "build": "pnpm --filter @sim/web build",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
   },

@@ -90,7 +90,9 @@ export function formatRun(run: RunResult, every = 10): string {
     bold(`${run.meta.design_id} · ${run.meta.scenario_id} · seed ${run.meta.seed} · run ${run.meta.run_id}`),
     dim(
       `${run.meta.events} events${run.meta.truncated ? ' (TRUNCATED)' : ''} · requests ${t.requests}, ok ${t.ok}, failed ${t.failed}` +
-        ` · LLM cost $${t.cost_usd.toFixed(2)}${t.cost_per_success_usd !== null ? ` ($${t.cost_per_success_usd.toFixed(4)} per success)` : ''}`,
+        (Object.values(run.nodes).some((n) => n.primitive === 'llm')
+          ? ` · LLM cost $${t.cost_usd.toFixed(2)}${t.cost_per_success_usd !== null ? ` ($${t.cost_per_success_usd.toFixed(4)} per success)` : ''}`
+          : ''),
     ),
     dim('Rates are per second averaged over each 10 s; util/queue at the end of the interval; err = errors + rejected + 429 in the interval.'),
     line(head),

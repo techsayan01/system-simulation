@@ -30,7 +30,9 @@ pnpm bench
 
 From `retry-storm` (abridged):
 
-> **HIGH F-001 System does not recover after a load spike.** A 3x spike lasting 60 s left the system failing after load returned to normal: goodput was 99.8% before the spike and 0% from 180 s to 300 s. Reproduced 3/3 seeds.
+> **HIGH F-001 System does not recover after a load spike.** A 3x spike lasting 60 s left the system failing after load returned to normal: goodput was 99.8% before the spike and 0% from 180 s to 300 s. The bottleneck is db, which stays fully busy … api backs up behind it because its workers wait on db. Reproduced 3/3 seeds.
+>
+> **HIGH F-002 Retries at 2 layers multiply load on db.** client(checkout)->lb (2 retries, no backoff) and api->db (2 retries, no backoff). One request can reach db up to 9 times; measured 3.2x the normal calls per request.
 
 From `rate-limit-cascade`:
 
@@ -42,6 +44,24 @@ From `runaway-agent`:
 
 Every finding carries the scenario, the time and load it started at, the component, its metrics, how many seeds reproduced it, and the run ID that regenerates the evidence.
 
+Two rules keep findings pointed at causes rather than symptoms:
+
+- **Bottleneck tracing.** A saturated component whose own callee is also saturated is only waiting, so the analyzer follows the calls down and names the saturated component with no saturated callee. The ones waiting on it are listed as backed up.
+- **Stacked retries.** Retries at several layers on the way to the same component multiply each other, so they are reported once, against the component that receives the multiplied load, with the theoretical worst case and the measured increase.
+
+## Visual simulator
+
+`pnpm dev` opens the visual simulator at http://localhost:5173 (`apps/web`). You draw the design on a canvas, press Play, and the same engine runs live in the browser:
+
+- Requests show as moving dots on each connection, more dots for more calls per second and red dots for calls that fail or time out. Retries (↻) and timeouts (⏱) per second appear on the connection label.
+- Each component shows how busy it is, its queue, calls per second, failure rate and p99, and a status word with colour: Healthy, Busy, Overloaded, Failing, Rate limited, Looping, Runaway, Down.
+- While it runs you can change the traffic multiplier (0.1× to 10×), the speed (1×, 5×, 20×), and take any component down or slow it 5×.
+- Changing the design restarts the simulation from 0 s, keeping the traffic level and the faults.
+- **Find problems** runs the standard stress-test battery in a background worker and lists the findings. **Show on canvas** points at the component, and **Watch it happen** recreates the condition live.
+- **Export** downloads the design as YAML for the `sim` command line.
+
+The engine gained a live mode for this (`LiveSim` in `packages/engine/src/live.ts`): it advances in small steps on each animation frame and accepts traffic and fault changes mid-run.
+
 ## What was built
 
 | Package | Contents |
@@ -51,6 +71,7 @@ Every finding carries the scenario, the time and load it started at, the compone
 | `packages/engine` | Deterministic discrete-event engine: station, router, LLM provider (three token buckets, token-based latency, per-token cost) and agent loop primitives; edge timeouts and retries with backoff and jitter; per-window metrics; run IDs |
 | `packages/scenarios` | Standard battery: baseline, ramp 0.5x→5x, spike 3x, LLM limits halved, outage of each leaf dependency |
 | `packages/detectors` | Five detectors and the analyzer that confirms findings across seeds and merges them across scenarios |
+| `apps/web` | Visual simulator: drag-and-drop canvas, live simulation, Find problems |
 | `apps/cli` | `sim analyze`, `sim run`, `sim scenarios`, `sim bench`, `sim types` |
 | `benchmarks/` | Four benchmark designs and the gate manifest |
 

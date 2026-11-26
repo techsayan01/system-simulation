@@ -124,11 +124,24 @@ export class LatencyWindow {
 
 // ---------------------------------------------------------------- faults
 
+/** A fault switched on by hand while a live simulation runs. */
+export interface FaultOverride {
+  errorRate?: number;
+  slowdown?: number;
+  limitScale?: number;
+}
+
 export class Faults {
   private readonly byTarget = new Map<string, Fault[]>();
+  private readonly overrides = new Map<string, FaultOverride>();
 
   constructor(faults: Fault[]) {
     for (const f of faults) this.byTarget.set(f.target, [...(this.byTarget.get(f.target) ?? []), f]);
+  }
+
+  setOverride(id: string, o: FaultOverride | null): void {
+    if (o) this.overrides.set(id, o);
+    else this.overrides.delete(id);
   }
 
   private active(id: string, tS: number): Fault[] {
@@ -139,17 +152,18 @@ export class Faults {
   errorRate(id: string, base: number, tS: number): number {
     let r = base;
     for (const f of this.active(id, tS)) if (f.kind === 'error_rate') r = Math.max(r, f.value);
-    return r;
+    const o = this.overrides.get(id)?.errorRate;
+    return o !== undefined ? Math.max(r, o) : r;
   }
 
   slowdown(id: string, tS: number): number {
-    let s = 1;
+    let s = this.overrides.get(id)?.slowdown ?? 1;
     for (const f of this.active(id, tS)) if (f.kind === 'slowdown') s *= f.factor;
     return s;
   }
 
   limitScale(id: string, tS: number): number {
-    let s = 1;
+    let s = this.overrides.get(id)?.limitScale ?? 1;
     for (const f of this.active(id, tS)) if (f.kind === 'limit_scale') s *= f.factor;
     return s;
   }
@@ -357,6 +371,14 @@ export class StationRt extends NodeRt {
 
   get queueLength(): number {
     return this.q.length - this.qh;
+  }
+
+  get concurrency(): number | null {
+    return Number.isFinite(this.conc) ? this.conc : null;
+  }
+
+  get busyNow(): number {
+    return this.busy;
   }
 
   accept(job: Job): void {
@@ -696,6 +718,30 @@ export class ClassRt {
       if (t >= endUs) return;
       sim.at(t, () => {
         if (this.rng.next() * maxMult < mult(sim.now / 1e6)) this.arrive();
+        schedule();
+      });
+    };
+    schedule();
+  }
+
+  private liveGen = 0;
+  private liveMult = 0;
+
+  /**
+   * Live arrivals at the base rate times `mult`, which can change at any time. Poisson
+   * arrivals are memoryless, so dropping the pending arrival and drawing a new gap at the
+   * new rate is exact.
+   */
+  setLiveRate(mult: number): void {
+    this.liveMult = mult;
+    const gen = ++this.liveGen;
+    if (!(mult > 0)) return;
+    const sim = this.ctx.sim;
+    const schedule = () => {
+      const gap = Math.max(1, Math.round(this.rng.exponential(1e6 / (this.baseRps * this.liveMult))));
+      sim.at(sim.now + gap, () => {
+        if (gen !== this.liveGen) return;
+        this.arrive();
         schedule();
       });
     };
